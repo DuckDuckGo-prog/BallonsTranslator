@@ -36,9 +36,9 @@ def wrap_fntformat_input(values: str, blkitems: List[TextBlkItem], is_global: bo
     if is_global:
         blkitems = SW.canvas.selected_text_items()
     else:
-        blkitems = blkitems if isinstance(blkitems, List) else [blkitems]
-    if not isinstance(values, List):
-        values = [values] * len(blkitems)
+        if not isinstance(blkitems, List):
+            blkitems = [blkitems]
+    values = [values] * len(blkitems)
     return blkitems, values
 
 def font_formating(push_undostack: bool = False):
@@ -47,7 +47,11 @@ def font_formating(push_undostack: bool = False):
 
         def wrapper(param_name: str, values: str, act_ffmt: FontFormat, is_global: bool, blkitems: List[TextBlkItem] = None, set_focus: bool = False, *args, **kwargs):
             if is_global:
-                act_ffmt[param_name] = values
+                if hasattr(act_ffmt, param_name):
+                    act_ffmt[param_name] = values
+                else:
+                    print(f'undefined param name: {param_name}')
+
             blkitems, values = wrap_fntformat_input(values, blkitems, is_global)
             if len(blkitems) > 0:
                 act_ffmt[param_name] = values[0]
@@ -138,9 +142,14 @@ def ffmt_change_stroke_width(param_name: str, values: float, act_ffmt: FontForma
 def ffmt_change_font_size(param_name: str, values: float, act_ffmt: FontFormat, is_global: bool, blkitems: List[TextBlkItem], clip_size=False, **kwargs):
     set_kwargs = global_default_set_kwargs if is_global else local_default_set_kwargs
     for blkitem, value in zip(blkitems, values):
-        if value < 0:
+        if value < 0 and param_name == "font_size":
             continue
-        blkitem.setFontSize(px2pt(value), clip_size=clip_size, **set_kwargs)
+        if param_name == "font_size":
+            setFontSize = blkitem.setFontSize
+            value = px2pt(value)
+        else:
+            setFontSize = blkitem.setRelFontSize
+        setFontSize(value, clip_size=clip_size, **set_kwargs)
 
 @font_formating(push_undostack=True)
 def ffmt_change_alignment(param_name: str, values: float, act_ffmt: FontFormat, is_global: bool, blkitems: List[TextBlkItem], **kwargs):
@@ -149,7 +158,34 @@ def ffmt_change_alignment(param_name: str, values: float, act_ffmt: FontFormat, 
         blkitem.setAlignment(value, restore_cursor=restore_cursor)
 
 @font_formating(push_undostack=True)
+def ffmt_change_opacity(param_name: str, values: float, act_ffmt: FontFormat, is_global: bool, blkitems: List[TextBlkItem], **kwargs):
+    for blkitem, value in zip(blkitems, values):
+        blkitem.setOpacity(value)
+
+@font_formating(push_undostack=True)
 def ffmt_change_line_spacing_type(param_name: str, values: float, act_ffmt: FontFormat, is_global: bool, blkitems: List[TextBlkItem], **kwargs):
     restore_cursor = not is_global
     for blkitem, value in zip(blkitems, values):
         blkitem.setLineSpacingType(value, restore_cursor=restore_cursor)
+
+
+@font_formating(push_undostack=True)
+def ffmt_change_shadow_offset(param_name: str, values: float, act_ffmt: FontFormat, is_global: bool, blkitems: List[TextBlkItem], **kwargs):
+    for blkitem, value in zip(blkitems, values):
+        blkitem.setBGAttribute(param_name, value)
+
+
+@font_formating()
+def ffmt_change_gradient_enabled(param_name: str, values: float, act_ffmt: FontFormat, is_global: bool, blkitems: List[TextBlkItem], **kwargs):
+    for blkitem, value in zip(blkitems, values):
+        blkitem.setGradientAttribute(param_name, value)
+
+
+ffmt_change_shadow_radius = ffmt_change_shadow_offset
+ffmt_change_shadow_strength = ffmt_change_shadow_offset
+ffmt_change_shadow_color = ffmt_change_shadow_offset
+
+ffmt_change_gradient_start_color = ffmt_change_gradient_enabled
+ffmt_change_gradient_end_color = ffmt_change_gradient_enabled
+ffmt_change_gradient_angle = ffmt_change_gradient_enabled
+ffmt_change_gradient_size = ffmt_change_gradient_enabled

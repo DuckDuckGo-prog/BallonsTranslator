@@ -2,6 +2,8 @@ import re
 import numpy as np
 import time
 import cv2
+import random
+import string
 from typing import List
 
 import httpx
@@ -19,23 +21,57 @@ class LensCore:
         'image/x-icon', 'image/bmp', 'image/jpeg',
         'image/png', 'image/tiff', 'image/webp', 'image/heic'
     ]
+    # https://github.com/AuroraWright/owocr/blob/master/owocr/ocr.py
     HEADERS = {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
         'Accept-Encoding': 'gzip, deflate, br',
         'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'max-age=0',
         'Origin': 'https://lens.google.com',
         'Referer': 'https://lens.google.com/',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Sec-Ch-Ua': '"Not A(Brand";v="99", "Google Chrome";v="131", "Chromium";v="131"',
+        'Sec-Ch-Ua-Arch': '"x86"',
+        'Sec-Ch-Ua-Bitness': '"64"',
+        'Sec-Ch-Ua-Full-Version': '"131.0.6778.205"',
+        'Sec-Ch-Ua-Full-Version-List': '"Not A(Brand";v="99.0.0.0", "Google Chrome";v="131", "Chromium";v="131"',
+        'Sec-Ch-Ua-Mobile': '?0',
+        'Sec-Ch-Ua-Model': '""',
+        'Sec-Ch-Ua-Platform': '"Windows"',
+        'Sec-Ch-Ua-Platform-Version': '"15.0.0"',
+        'Sec-Ch-Ua-Wow64': '?0',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'same-origin',
+        'Sec-Fetch-User': '?1',
+        'Upgrade-Insecure-Requests': '1',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        'X-Client-Data': 'CIW2yQEIorbJAQipncoBCIH+ygEIkqHLAQiKo8sBCPWYzQEIhaDNAQji0M4BCLPTzgEI19TOAQjy1c4BCJLYzgEIwNjOAQjM2M4BGM7VzgE='
     }
 
     def __init__(self, proxy=None):
         self.proxy = proxy
         self.cookie_jar = cookielib.CookieJar()
 
-    def _send_request(self, url, headers, files):
+    def _send_request(self, url, headers, files, params=None):
         try:
-            client = httpx.Client(proxies=self.proxy) if self.proxy else httpx.Client()
-            response = client.post(url, headers=headers, files=files)
+            client_kwargs = {}
+            if self.proxy:
+                if isinstance(self.proxy, str):
+                    client_kwargs['proxy'] = self.proxy
+                elif isinstance(self.proxy, dict):
+                    mounts = {}
+                    if 'http://' in self.proxy:
+                        mounts["http://"] = httpx.HTTPTransport(proxy=self.proxy['http://'])
+                    if 'https://' in self.proxy:
+                        mounts["https://"] = httpx.HTTPTransport(proxy=self.proxy['https://'])
+                    if mounts:
+                        client_kwargs['mounts'] = mounts
+                else:
+                    raise ValueError("Proxy must be a string or a dictionary")
+            client = httpx.Client(**client_kwargs)
+            response = client.post(url, headers=headers, files=files, params=params)
+            if response.status_code == 303:
+                raise Exception("Error 303: See Other. Potential misconfiguration in headers or file upload.")
             if response.status_code != 200:
                 raise Exception(f"Failed to upload image. Status code: {response.status_code}")
             return response
@@ -44,16 +80,18 @@ class LensCore:
 
     def scan_by_data(self, data, mime, dimensions):
         headers = self.HEADERS.copy()
+        random_filename = ''.join(random.choices(string.ascii_letters, k=8)) + '.jpg'
         files = {
-            'encoded_image': ('image.jpg', data, mime),
+            'encoded_image': (random_filename, data, mime),
             'original_width': (None, str(dimensions[0])),
             'original_height': (None, str(dimensions[1])),
             'processed_image_dimensions': (None, f"{dimensions[0]},{dimensions[1]}")
         }
-        response = self._send_request(self.LENS_ENDPOINT, headers, files)
+        params = {'ep': 'ccm', 're': 'dcsp', 's': '4', 'st': str(time.time() * 1000), 'sideimagesearch': '1', 'vpw': str(dimensions[0]), 'vph': str(dimensions[1])}
+        response = self._send_request(self.LENS_ENDPOINT, headers, files, params=params)
         if response.status_code != 200:
             raise Exception(f"Failed to upload image. Status code: {response.status_code}")
-        
+
         tree = lxml.html.parse(io.StringIO(response.text))
         r = tree.xpath("//script[@class='ds:1']")
         return json5.loads(r[0].text[len("AF_initDataCallback("):-2])
@@ -91,7 +129,7 @@ class LensAPI:
         if isinstance(data, list):
             for item in data:
                 if isinstance(item, list):
-                    for sub_item in item:
+                    for sub_item in item: # Corrected loop variable name
                         if isinstance(sub_item, list) and len(sub_item) > 1 and isinstance(sub_item[0], str):
                             word = sub_item[0]
                             coords = sub_item[1]
@@ -226,18 +264,18 @@ class OCRLensAPI(OCRBase):
         },
         'description': 'OCR using Google Lens API'
     }
-    
+
     @property
     def request_delay(self):
         try:
             return float(self.get_param_value('delay'))
         except (ValueError, TypeError):
-            return 1.0 
+            return 1.0
 
     @property
     def newline_handling(self):
         return self.get_param_value('newline_handling')
-    
+
     @property
     def no_uppercase(self):
         return self.get_param_value('no_uppercase')
@@ -245,7 +283,7 @@ class OCRLensAPI(OCRBase):
     @property
     def response_method(self):
         return self.get_param_value('response_method')
-    
+
     @property
     def proxy(self):
         return self.get_param_value('proxy')
@@ -255,7 +293,7 @@ class OCRLensAPI(OCRBase):
             try:
                 params['delay'] = float(params['delay'])
             except (ValueError, TypeError):
-                params['delay'] = 1.0  # Значение по умолчанию
+                params['delay'] = 1.0  
         super().__init__(**params)
         self.api = LensAPI(proxy=self.proxy)
         self.last_request_time = 0
@@ -282,7 +320,7 @@ class OCRLensAPI(OCRBase):
         if self.debug_mode:
             self.logger.debug(f'ocr_img: {img.shape}')
         return self.ocr(img)
-    
+
     def ocr(self, img: np.ndarray) -> str:
         if self.debug_mode:
             self.logger.debug(f'Starting OCR on image of shape: {img.shape}')
@@ -334,7 +372,7 @@ class OCRLensAPI(OCRBase):
 
         sentences = re.split(r'(?<=[.!?…])\s+', text)
         processed_sentences = [process_sentence(sentence) for sentence in sentences]
-        
+
         return ' '.join(processed_sentences)
 
     def _apply_punctuation_and_spacing(self, text: str) -> str:

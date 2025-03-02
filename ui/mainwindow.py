@@ -123,6 +123,7 @@ class MainWindow(mainwindow_cls):
         screen_size = QGuiApplication.primaryScreen().geometry().size()
         self.setMinimumWidth(screen_size.width() // 2)
         self.configPanel = ConfigPanel(self)
+        self.configPanel.trans_config_panel.show_pre_MT_keyword_window.connect(self.show_pre_MT_keyword_window)
         self.configPanel.trans_config_panel.show_MT_keyword_window.connect(self.show_MT_keyword_window)
         self.configPanel.trans_config_panel.show_OCR_keyword_window.connect(self.show_OCR_keyword_window)
 
@@ -191,8 +192,6 @@ class MainWindow(mainwindow_cls):
         
         self.drawingPanel = DrawingPanel(self.canvas, self.configPanel.inpaint_config_panel)
         self.textPanel = TextPanel(self.app)
-        self.textPanel.formatpanel.effect_panel.setParent(self)
-        self.textPanel.formatpanel.effect_panel.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.CustomizeWindowHint)
         self.textPanel.formatpanel.foldTextBtn.checkStateChanged.connect(self.fold_textarea)
         self.textPanel.formatpanel.sourceBtn.checkStateChanged.connect(self.show_source_text)
         self.textPanel.formatpanel.transBtn.checkStateChanged.connect(self.show_trans_text)
@@ -203,6 +202,10 @@ class MainWindow(mainwindow_cls):
         self.ocrSubWidget.setParent(self)
         self.ocrSubWidget.setWindowFlags(Qt.WindowType.Window)
         self.ocrSubWidget.hide()
+        self.mtPreSubWidget = KeywordSubWidget(self.tr("Keyword substitution for machine translation source text"))
+        self.mtPreSubWidget.setParent(self)
+        self.mtPreSubWidget.setWindowFlags(Qt.WindowType.Window)
+        self.mtPreSubWidget.hide()
         self.mtSubWidget = KeywordSubWidget(self.tr("Keyword substitution for machine translation"))
         self.mtSubWidget.setParent(self)
         self.mtSubWidget.setWindowFlags(Qt.WindowType.Window)
@@ -274,7 +277,7 @@ class MainWindow(mainwindow_cls):
         module_manager.finish_translate_page.connect(self.finishTranslatePage)
         module_manager.imgtrans_pipeline_finished.connect(self.on_imgtrans_pipeline_finished)
         module_manager.page_trans_finished.connect(self.on_pagtrans_finished)
-        module_manager.setupThread(self.configPanel, self.imgtrans_progress_msgbox, self.ocr_postprocess, self.translate_postprocess)
+        module_manager.setupThread(self.configPanel, self.imgtrans_progress_msgbox, self.ocr_postprocess, self.translate_preprocess, self.translate_postprocess)
         module_manager.progress_msgbox.showed.connect(self.on_imgtrans_progressbox_showed)
         module_manager.imgtrans_thread.mask_postprocess = self.drawingPanel.rectPanel.post_process_mask
         module_manager.blktrans_pipeline_finished.connect(self.on_blktrans_finished)
@@ -297,6 +300,9 @@ class MainWindow(mainwindow_cls):
         self.configPanel.setupConfig()
         self.configPanel.save_config.connect(self.save_config)
         self.configPanel.reload_textstyle.connect(self.load_textstyle_from_proj_dir)
+        self.configPanel.show_only_custom_font.connect(self.on_show_only_custom_font)
+        if pcfg.let_show_only_custom_fonts_flag:
+            self.on_show_only_custom_font(True)
 
         textblock_mode = pcfg.imgtrans_textblock
         if pcfg.imgtrans_textedit:
@@ -326,6 +332,13 @@ class MainWindow(mainwindow_cls):
             LOGGER.error(traceback.format_exc())
             pcfg.ocr_sublist = []
             self.ocrSubWidget.loadCfgSublist(pcfg.ocr_sublist)
+
+        try:
+            self.mtPreSubWidget.loadCfgSublist(pcfg.pre_mt_sublist)
+        except Exception as e:
+            LOGGER.error(traceback.format_exc())
+            pcfg.pre_mt_sublist = []
+            self.mtPreSubWidget.loadCfgSublist(pcfg.pre_mt_sublist)
 
         try:
             self.mtSubWidget.loadCfgSublist(pcfg.mt_sublist)
@@ -367,6 +380,13 @@ class MainWindow(mainwindow_cls):
         else:
             pcfg.text_styles_path = text_style_path
             save_text_styles()
+
+    def on_show_only_custom_font(self, only_custom: bool):
+        if only_custom:
+            font_list = shared.CUSTOM_FONTS
+        else:
+            font_list = shared.FONT_FAMILIES
+        self.textPanel.formatpanel.familybox.update_font_list(font_list)
 
     def openDir(self, directory: str):
         try:
@@ -494,6 +514,7 @@ class MainWindow(mainwindow_cls):
         self.titleBar.undo_trigger.connect(self.on_undo)
         self.titleBar.page_search_trigger.connect(self.on_page_search)
         self.titleBar.global_search_trigger.connect(self.on_global_search)
+        self.titleBar.replacePreMTkeyword_trigger.connect(self.show_pre_MT_keyword_window)
         self.titleBar.replaceMTkeyword_trigger.connect(self.show_MT_keyword_window)
         self.titleBar.replaceOCRkeyword_trigger.connect(self.show_OCR_keyword_window)
         self.titleBar.run_trigger.connect(self.leftBar.runImgtransBtn.click)
@@ -684,6 +705,9 @@ class MainWindow(mainwindow_cls):
                 se.setTextCursor(cursor)
                 
                 self.global_search_widget.commit_search()
+
+    def show_pre_MT_keyword_window(self):
+        self.mtPreSubWidget.show()
 
     def show_MT_keyword_window(self):
         self.mtSubWidget.show()
@@ -1270,6 +1294,10 @@ class MainWindow(mainwindow_cls):
         for blk in textblocks:
             text = blk.get_text()
             blk.text = self.ocrSubWidget.sub_text(text)
+
+    def translate_preprocess(self, translations: List[str] = None, textblocks: List[TextBlock] = None, translator = None, source_text:list = []):
+        for i in range(len(source_text)):
+            source_text[i] = self.mtPreSubWidget.sub_text(source_text[i])
 
     def translate_postprocess(self, translations: List[str] = None, textblocks: List[TextBlock] = None, translator = None):
         if not self.postprocess_mt_toggle:

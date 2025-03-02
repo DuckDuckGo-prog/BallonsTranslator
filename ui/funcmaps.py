@@ -3,6 +3,7 @@ from utils.fontformat import FontFormat
 from utils.config import pcfg
 from utils.textblock_mask import canny_flood, connected_canny_flood, existing_mask
 
+# Build base function map
 handle_ffmt_change = build_funcmap('ui.fontformat_commands', 
                                      list(FontFormat.params().keys()), 
                                      'ffmt_change_', verbose=False)
