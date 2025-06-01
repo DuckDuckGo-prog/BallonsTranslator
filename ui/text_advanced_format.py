@@ -80,7 +80,8 @@ class TextShadowGroup(QGroupBox):
 
 class TextGradientGroup(QGroupBox):
     def __init__(self, on_param_changed: Callable = None):
-        super().__init__(title=self.tr('Gradient'))
+        super().__init__()
+        self.setTitle(self.tr('Gradient'))
         self.on_param_changed = on_param_changed
 
         self.start_picker = SmallColorPickerLabel(self, param_name='gradient_start_color')
@@ -150,9 +151,7 @@ class TextAdvancedFormatPanel(PanelArea):
                 self.tr("Distance")
             ]
         )
-        self.linespacing_type_combobox.activated.connect(
-            lambda:  self.on_format_changed('line_spacing_type', self.linespacing_type_combobox.currentIndex)
-        )
+        self.linespacing_type_combobox.activated.connect(self.on_linespacing_type_changed)
         linespacing_type_label = SmallParamLabel(self.tr('Line Spacing Type'))
         linespacing_type_layout = QHBoxLayout()
         linespacing_type_layout.addWidget(linespacing_type_label)
@@ -167,7 +166,6 @@ class TextAdvancedFormatPanel(PanelArea):
         opacity_layout = QHBoxLayout()
         opacity_layout.addWidget(self.opacity_label)
         opacity_layout.addWidget(self.opacity_box)
-
 
         # self.tate_chu_yoko_checker = QFontChecker()
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
@@ -195,6 +193,8 @@ class TextAdvancedFormatPanel(PanelArea):
         TEXT_ADVANCED_PANEL_MAXH = 300
         self.setFixedHeight(min(TEXT_ADVANCED_PANEL_MAXH, self.scrollContent.height()))
 
+    def on_linespacing_type_changed(self):
+        self.on_format_changed('line_spacing_type', self.linespacing_type_combobox.currentIndex())
 
     def set_active_format(self, font_format: FontFormat):
         self.active_format = font_format

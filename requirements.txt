@@ -32,7 +32,7 @@ keyboard
 ordered-set
 opencc-python-reimplemented
 requests
-Pillow>=10.0.1
+ultralytics==8.3.90
 beautifulsoup4
 colorama
 openai==1.65.2
@@ -53,3 +53,4 @@ pyobjc-framework-coreml; sys_platform == 'darwin'
 pyobjc-framework-quartz; sys_platform == 'darwin'
 pyobjc-framework-vision; sys_platform == 'darwin'
 msl-loadlib
+betterproto

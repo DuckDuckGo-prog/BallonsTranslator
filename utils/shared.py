@@ -29,6 +29,16 @@ CONFIG_COMBOBOX_SHORT = 200
 CONFIG_COMBOBOX_MIDEAN = 332
 CONFIG_COMBOBOX_LONG = 468
 
+_size2width = {
+    'short': CONFIG_COMBOBOX_SHORT,
+    'median': CONFIG_COMBOBOX_MIDEAN,
+    'long':CONFIG_COMBOBOX_LONG
+}
+
+def size2width(size: str):
+    global _size2width
+    return _size2width[size]
+
 HORSLIDER_FIXHEIGHT = 36
 
 WIDGET_SPACING_CLOSE = 8
@@ -37,8 +47,8 @@ TEXTEDIT_FIXWIDTH = 350
 TEXTEFFECT_FIXWIDTH = 400
 TEXTEFFECT_MAXHEIGHT = 500
 
-LEFTBAR_WIDTH = 60
-LEFTBTN_WIDTH = 38
+LEFTBAR_WIDTH = 48
+LEFTBTN_WIDTH = 28
 
 LDPI = 96.
 DPI = 188.75
@@ -69,7 +79,9 @@ DISPLAY_LANGUAGE_MAP = {
     "简体中文": "zh_CN",
     "Русский": "ru_RU",
     "Português (Brasil)": "pt_BR",
-    "한국어": "ko_KR"
+    "한국어": "ko_KR",
+    "Español": "es_MX",
+    "Hungarian": "hu_HU"
 }
 VALID_LANG_SET = set(list(DISPLAY_LANGUAGE_MAP.values()))
 

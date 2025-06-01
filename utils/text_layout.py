@@ -195,6 +195,7 @@ def layout_lines_aligncenter(
             pos_y = centroid_y - int(blk.bounding_rect()[3] / 2)
         else:
             pos_y = centroid_y + line_height // 2
+        pos_y = max(0, min(pos_y, mask.shape[0] - 1))
         top_mean = mask[pos_y, :].mean()
         x_mean = mask.mean(axis=1)
         base_mean = x_mean.max() / 2
@@ -238,11 +239,6 @@ def layout_lines_aligncenter(
                         break
 
             if not line_valid:
-                # import cv2
-                # m = mask.copy()
-                # m = cv2.cvtColor(m, cv2.COLOR_GRAY2BGR)
-                # cv2.rectangle(m, (new_x, pos_y), (right_x, line_bottom), (255, 0, 0), 1)
-                # cv2.imwrite('mask.jpg', m)
                 pos_x = centroid_x - wl // 2
                 pos_y = line_bottom
                 line_bottom += line_height
@@ -256,6 +252,7 @@ def layout_lines_aligncenter(
         w, wl = wlst_left.pop(-1), len_left.pop(-1)
         pos_x = centroid_x - wl // 2
         pos_y = centroid_y - line_height // 2 - line_height
+        pos_y = max(0, min(pos_y, mask.shape[0] - 1))
         line_bottom = pos_y + line_height
         line = Line(w, pos_x, pos_y, wl, spacing)
         lines.insert(0, line)
@@ -296,13 +293,6 @@ def layout_lines_aligncenter(
                 line = Line(w, pos_x, pos_y, wl, spacing)
                 lines.insert(0, line)
                 line_left_no -= 1
-
-    # rbgmsk = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
-    # cv2.circle(rbgmsk, (centroid_x, centroid_y), 10, (255, 0, 0))
-    # for line in lines:
-    #     cv2.rectangle(rbgmsk, (line.pos_x, line.pos_y), (line.pos_x + line.length, line.pos_y + line_height), (0, 255, 0))
-    # cv2.imshow('mask', rbgmsk)
-    # cv2.waitKey(0)
     
     return lines, (adjust_x, adjust_y)
 
